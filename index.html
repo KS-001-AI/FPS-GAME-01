@@ -1,40 +1,65 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEON BREACH | FPS GAME 01</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02050e;color:#eff;font-family:system-ui,Arial,sans-serif}canvas{display:block;width:100vw;height:100vh;cursor:crosshair}#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 2px 14px #000}header{display:flex;justify-content:space-between;padding:24px 30px;letter-spacing:.16em;font-size:12px;color:#8dfcf3;font-weight:800}header b{font-size:23px;letter-spacing:.08em;color:white}#wave{text-align:right}#wave b{color:#ff5795}.bottom{position:absolute;bottom:24px;left:30px;right:30px;display:flex;justify-content:space-between;align-items:end}.stat{font-weight:900;font-size:39px}.stat small{display:block;font-size:11px;letter-spacing:.16em;color:#a6c2ce}.meter{width:180px;height:5px;background:#355}.meter i{display:block;height:100%;background:#7fffea;width:100%}#ammo{text-align:right}.help{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.1em;white-space:nowrap;color:#b9d1df}#overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle,#152544dc,#020510f7 70%);text-align:center;padding:25px}#overlay.hide{display:none}#overlay h1{font-size:clamp(58px,10vw,120px);line-height:.82;letter-spacing:-.09em;margin:12px 0 25px}#overlay h1 span{color:#ff478e}#overlay p{max-width:450px;line-height:1.7;color:#b7ccd7;margin:0 auto 24px}button{border:1px solid #81fff3;color:#031522;background:#85fff1;cursor:pointer;padding:16px 35px;font-weight:900;letter-spacing:.15em}button:hover{background:white}#notice{position:absolute;top:26%;left:50%;transform:translateX(-50%);color:#ff66a7;font-size:27px;font-weight:900;letter-spacing:.1em;text-align:center;opacity:0}#notice.show{opacity:1}#mini{position:absolute;top:92px;left:30px;width:135px;height:135px;border:1px solid #53b9d055;background:#030b1a9c}#hurt{position:fixed;inset:0;pointer-events:none;border:0 solid transparent}#pause{position:absolute;top:45%;width:100%;text-align:center;display:none;letter-spacing:.2em;font-weight:900}#pause.show{display:block}@media(max-width:600px){header{padding:15px}header b{font-size:17px}.bottom{left:15px;right:15px}.stat{font-size:29px}#mini{width:95px;height:95px;left:15px;top:75px}.help{display:none}}
-</style></head><body><canvas id="game" width="960" height="540"></canvas><div id="hurt"></div><div id="hud"><header><div>SECTOR 07<br><b>NEON BREACH</b></div><div id="wave">SURVIVAL PROTOCOL<br><b>WAVE 01</b><div id="score">SCORE 00000</div></div></header><canvas id="mini" width="160" height="160"></canvas><div id="notice"></div><div id="pause">PAUSED // CLICK TO RESUME</div><div class="bottom"><div class="stat"><small>INTEGRITY</small><span id="hp">100</span><div class="meter"><i id="meter"></i></div></div><div class="stat" id="ammo"><small>VX-9 // PULSE CARBINE</small><span id="bullets">24</span> / <span id="reserve">144</span></div></div><div class="help">WASD MOVE · MOUSE AIM · LEFT CLICK FIRE · SHIFT SPRINT · R RELOAD · ESC PAUSE</div></div><div id="overlay"><div><div style="color:#8ff;letter-spacing:.35em;font-weight:900">◆ ARENA PROTOCOL ONLINE ◆</div><h1>NEON<br><span>BREACH</span></h1><p>Rogue drones have overrun Sector 07. Fight through relentless waves, target critical cores, and survive the arena.</p><button id="start">ENTER THE ARENA</button><p style="margin-top:20px;font-size:12px">DESKTOP · KEYBOARD + MOUSE RECOMMENDED</p></div></div>
-<script>
-(()=>{'use strict';
-const C=document.getElementById('game'),c=C.getContext('2d'),m=document.getElementById('mini').getContext('2d'),$=id=>document.getElementById(id),W=960,H=540,FOV=1.05;
-const rows=['########################','#..........#...........#','#..##......#.....##....#','#...#.............#....#','#......................#','#.....###......###.....#','#......................#','##......#........#.....#','#.......#..............#','#......................#','#..#...............#...#','#..#....###..###...#...#','#......................#','#......#.........#.....#','#......#.........#.....#','#......................#','#...#......##......#...#','#...#..............#...#','#......................#','#.....###......###.....#','#......................#','#..........#...........#','#..........#...........#','########################'];
-const p={x:4.5,y:9.5,a:0,hp:100,ammo:24,res:144,score:0,wave:1,kills:0,reload:0,cd:0,recoil:0,hurt:0,step:0};
-let enemies=[],keys={},down=false,playing=false,dead=false,pending=0,flash=0,hit=0,elapsed=0,last=0,noticeTime=0,audio;
-const wall=(x,y)=>x<0||y<0||x>=24||y>=24||rows[Math.floor(y)][Math.floor(x)]==='#';
-const free=(x,y,r=.25)=>!wall(x-r,y-r)&&!wall(x+r,y-r)&&!wall(x-r,y+r)&&!wall(x+r,y+r);
-function ray(x,y,a){let dx=Math.cos(a),dy=Math.sin(a),mx=Math.floor(x),my=Math.floor(y),sx=dx<0?-1:1,sy=dy<0?-1:1,tx=Math.abs(1/(dx||1e-8)),ty=Math.abs(1/(dy||1e-8)),vx=(dx<0?x-mx:mx+1-x)*tx,vy=(dy<0?y-my:my+1-y)*ty,side=0,d=0;for(let i=0;i<50;i++){if(vx<vy){mx+=sx;d=vx;vx+=tx;side=0}else{my+=sy;d=vy;vy+=ty;side=1}if(wall(mx+.5,my+.5))break}const u=(side?x+d*dx:y+d*dy)%1;return {d,side,u,mx,my}}
-function sound(freq,dur=.09){if(!audio)return;let o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime;o.type='sawtooth';o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,freq/4),t+dur);g.gain.setValueAtTime(.045,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+dur)}
-function ui(){$('hp').textContent=Math.max(0,Math.ceil(p.hp));$('meter').style.width=Math.max(0,p.hp)+'%';$('bullets').textContent=p.reload>0?'...':p.ammo;$('reserve').textContent=p.res;$('score').textContent='SCORE '+String(p.score).padStart(5,'0');$('wave').querySelector('b').textContent='WAVE '+String(p.wave).padStart(2,'0')}
-function announce(s){$('notice').textContent=s;$('notice').classList.add('show');noticeTime=2}
-function spawn(){let n=4+p.wave*2,tries=0;while(n>0&&tries++<400){let x=1.5+Math.random()*21,y=1.5+Math.random()*21;if(!free(x,y,.35)||Math.hypot(x-p.x,y-p.y)<4)continue;let elite=p.wave>1&&Math.random()<Math.min(.45,p.wave*.08);enemies.push({x,y,hp:elite?150:85,max:elite?150:85,elite,speed:(elite?1.05:1.35)+p.wave*.045,attack:Math.random(),phase:Math.random()*6,hit:0});n--}}
-function reset(){Object.assign(p,{x:4.5,y:9.5,a:0,hp:100,ammo:24,res:144,score:0,wave:1,kills:0,reload:0,cd:0,recoil:0,hurt:0,step:0});enemies=[];pending=0;dead=false;playing=true;spawn();ui();announce('WAVE 01 // INCOMING');$('overlay').classList.add('hide');C.requestPointerLock?.()}
-function lose(){playing=false;dead=true;document.exitPointerLock?.();$('overlay').classList.remove('hide');$('overlay').querySelector('p').textContent='SECTOR LOST · SCORE '+p.score+' · DRONES DESTROYED '+p.kills+' · WAVE '+p.wave;$('start').textContent='REDEPLOY'}
-function reload(){if(p.reload||p.ammo>=24||p.res<=0||!playing)return;p.reload=1.2;sound(350,.13);ui()}
-function fire(){if(!playing||document.pointerLockElement!==C||p.cd>0||p.reload>0)return;if(p.ammo<=0){reload();return}p.cd=.105;p.ammo--;p.recoil=1;flash=.07;sound(160);let best=null,bestD=999;for(const e of enemies){let dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy),a=Math.atan2(dy,dx)-p.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)<.065+.15/d&&d<bestD&&ray(p.x,p.y,Math.atan2(dy,dx)).d>d-.3){best=e;bestD=d}}if(best){best.hp-=p.recoil&&Math.random()<.2?110:43;best.hit=.17;hit=.12;p.score+=25;sound(650,.05);if(best.hp<=0){enemies.splice(enemies.indexOf(best),1);p.kills++;p.score+=best.elite?350:150;sound(820,.15)}}ui()}
-const z=new Float32Array(480);
-function drone(e,d){let a=Math.atan2(e.y-p.y,e.x-p.x)-p.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)>FOV*.8)return;let sx=W/2+Math.tan(a)/Math.tan(FOV/2)*W/2,s=Math.min(1000,350/(d*Math.cos(a))),ix=Math.floor(sx/2);if(ix<0||ix>=480||z[ix]<d-.3)return;let col=e.hit>0?'#fff':e.elite?'#f453a0':'#50e9ef';c.save();c.translate(sx,H/2-s*.47+Math.sin(elapsed*3+e.phase)*s*.02);c.shadowColor=col;c.shadowBlur=17;c.fillStyle=e.hit>0?'#fff':e.elite?'#72334d':'#164c67';c.fillRect(-s*.18,s*.2,s*.36,s*.45);c.fillRect(-s*.25,s*.3,s*.11,s*.31);c.fillRect(s*.14,s*.3,s*.11,s*.31);c.fillRect(-s*.14,s*.59,s*.105,s*.28);c.fillRect(s*.035,s*.59,s*.105,s*.28);c.fillRect(-s*.16,s*.03,s*.32,s*.23);c.fillStyle='#061222';c.fillRect(-s*.12,s*.095,s*.24,s*.07);c.fillStyle=col;c.fillRect(-s*.1,s*.117,s*.2,s*.025);c.fillRect(-s*.1,s*.35,s*.2,s*.04);c.fillStyle='#f33';c.fillRect(-s*.2,-s*.05,s*.4*(e.hp/e.max),s*.014);c.restore()}
-function weapon(){let b=Math.sin(p.step)*3;c.save();c.translate(W*.59,H*.96+b+p.recoil*23);c.rotate(-.06-p.recoil*.05);c.shadowColor='#04fcf6';c.shadowBlur=12;c.fillStyle='#0c1326';c.beginPath();c.moveTo(-110,100);c.lineTo(-75,-20);c.lineTo(-40,-105);c.lineTo(-17,-172);c.lineTo(15,-168);c.lineTo(47,-72);c.lineTo(90,100);c.fill();c.fillStyle='#243d55';c.fillRect(-47,-95,82,140);c.fillStyle='#101b2f';c.fillRect(-17,-200,23,112);c.fillStyle='#77fff4';c.fillRect(-42,-58,7,78);c.fillRect(28,-58,7,78);c.fillStyle='#ff5f9c';c.fillRect(-10,-70,25,5);if(flash){c.fillStyle='#fff4ab';c.beginPath();c.moveTo(-6,-200);c.lineTo(-55,-260);c.lineTo(-5,-235);c.lineTo(29,-277);c.lineTo(15,-204);c.fill()}c.restore()}
-function minimap(){m.fillStyle='#04111d';m.fillRect(0,0,160,160);m.save();m.translate(80,80);m.rotate(-p.a+Math.PI/2);for(let y=0;y<24;y++)for(let x=0;x<24;x++)if(wall(x+.5,y+.5)){m.fillStyle='#24506a';m.fillRect((x-p.x)*6.3,(y-p.y)*6.3,5.4,5.4)}for(const e of enemies){m.fillStyle=e.elite?'#ff4ea0':'#ff748b';m.beginPath();m.arc((e.x-p.x)*6.3,(e.y-p.y)*6.3,2.5,0,7);m.fill()}m.restore();m.fillStyle='#7ff';m.beginPath();m.moveTo(80,72);m.lineTo(75,85);m.lineTo(85,85);m.fill()}
-function draw(){let sky=c.createLinearGradient(0,0,0,270);sky.addColorStop(0,'#050b1d');sky.addColorStop(1,'#213455');c.fillStyle=sky;c.fillRect(0,0,W,270);c.fillStyle='#101828';c.fillRect(0,270,W,270);c.strokeStyle='#1a607044';for(let i=1;i<24;i++){let y=270+Math.pow(i/24,1.7)*270;c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}for(let i=-15;i<=15;i++){c.beginPath();c.moveTo(480,270);c.lineTo(480+i*150,540);c.stroke()}for(let x=0;x<W;x+=2){let a=p.a+Math.atan((x/W-.5)*2*Math.tan(FOV/2)),r=ray(p.x,p.y,a),d=Math.max(.05,r.d*Math.cos(a-p.a)),h=Math.min(2000,H/(d*.7)),top=(H-h)/2;z[x/2]=d;let fog=Math.max(.14,1-d/20),side=r.side?.72:1,tint=(r.mx*7+r.my*13)%3,base=tint===0?[64,37,93]:tint===1?[29,75,104]:[36,50,83];c.fillStyle='rgb('+base.map(v=>Math.floor(v*fog*side)).join(',')+')';c.fillRect(x,top,2,h+1);if(r.u<.04||r.u>.96){c.fillStyle='rgba(83,253,253,'+fog*.67+')';c.fillRect(x,top,2,h)}c.fillStyle='rgba(51,239,245,'+fog*.35+')';c.fillRect(x,top+h*.78,2,Math.max(1,h*.012))}enemies.slice().sort((a,b)=>Math.hypot(b.x-p.x,b.y-p.y)-Math.hypot(a.x-p.x,a.y-p.y)).forEach(e=>drone(e,Math.hypot(e.x-p.x,e.y-p.y)));weapon();let g=8+p.recoil*13;c.strokeStyle=hit?'#ff5798':'#cbffff';c.lineWidth=2;c.beginPath();c.moveTo(480-g-9,270);c.lineTo(480-g,270);c.moveTo(480+g,270);c.lineTo(480+g+9,270);c.moveTo(480,270-g-9);c.lineTo(480,270-g);c.moveTo(480,270+g);c.lineTo(480,270+g+9);c.stroke();let vignette=c.createRadialGradient(480,270,130,480,270,570);vignette.addColorStop(0,'#0000');vignette.addColorStop(1,'#000a');c.fillStyle=vignette;c.fillRect(0,0,W,H);minimap()}
-function update(dt){elapsed+=dt;if(noticeTime>0&&(noticeTime-=dt)<=0)$('notice').classList.remove('show');if(!playing||document.pointerLockElement!==C){$('pause').classList.toggle('show',playing);return}$('pause').classList.remove('show');p.cd=Math.max(0,p.cd-dt);p.recoil=Math.max(0,p.recoil-dt*8);p.hurt=Math.max(0,p.hurt-dt*2);flash=Math.max(0,flash-dt);hit=Math.max(0,hit-dt);if(p.reload>0&&(p.reload-=dt)<=0){let n=Math.min(24-p.ammo,p.res);p.ammo+=n;p.res-=n;ui()}if(down)fire();let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0),norm=Math.hypot(f,s);if(keys.ArrowLeft)p.a-=dt*2.2;if(keys.ArrowRight)p.a+=dt*2.2;if(norm){let speed=(keys.ShiftLeft||keys.ShiftRight?4.2:2.8)*dt/norm,dx=(Math.cos(p.a)*f-Math.sin(p.a)*s)*speed,dy=(Math.sin(p.a)*f+Math.cos(p.a)*s)*speed;if(free(p.x+dx,p.y))p.x+=dx;if(free(p.x,p.y+dy))p.y+=dy;p.step+=dt*11}for(const e of enemies){e.hit=Math.max(0,e.hit-dt);let d=Math.hypot(e.x-p.x,e.y-p.y);if(d>1.28){let a=Math.atan2(p.y-e.y,p.x-e.x),vx=Math.cos(a)*e.speed*dt,vy=Math.sin(a)*e.speed*dt;if(free(e.x+vx,e.y))e.x+=vx;if(free(e.x,e.y+vy))e.y+=vy}else{e.attack-=dt;if(e.attack<=0){e.attack=.8+Math.random()*.6;p.hp-=e.elite?17:11;p.hurt=1;sound(80,.22);ui();if(p.hp<=0){lose();return}}}}if(!enemies.length&&pending<=0){pending=3;p.hp=Math.min(100,p.hp+25);p.res=Math.min(240,p.res+48);p.score+=500;ui();announce('SECTOR CLEARED // +500')}if(pending>0&&(pending-=dt)<=0){p.wave++;spawn();announce('WAVE '+String(p.wave).padStart(2,'0')+' // INCOMING');sound(600,.3);ui()}$('hurt').style.boxShadow='inset 0 0 150px 30px rgba(255,20,80,'+(p.hurt*.3)+')'}
-function frame(t){let dt=Math.min(.05,(t-last)/1000||.016);last=t;update(dt);draw();requestAnimationFrame(frame)}
-$('start').onclick=()=>{if(!audio){let A=window.AudioContext||window.webkitAudioContext;if(A)audio=new A()}reset()};
-C.addEventListener('click',()=>{if(playing&&document.pointerLockElement!==C)C.requestPointerLock?.()});
-document.addEventListener('mousemove',e=>{if(playing&&document.pointerLockElement===C)p.a+=e.movementX*.0025});
-document.addEventListener('mousedown',e=>{if(e.button===0)down=true});
-document.addEventListener('mouseup',()=>down=false);
-document.addEventListener('keydown',e=>{keys[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='KeyR')reload()});
-document.addEventListener('keyup',e=>keys[e.code]=false);
-window.addEventListener('blur',()=>{keys={};down=false});
-requestAnimationFrame(frame);
-})();
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07121f">
+  <meta name="description" content="NEON BREACH: a cinematic 3D first-person survival shooter.">
+  <title>NEON BREACH | Tactical 3D FPS</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="viewport" aria-label="3D first-person shooter game"></main>
+  <div id="vignette"></div><div id="damage"></div><div id="flash"></div>
+  <section id="hud" aria-label="Heads-up display">
+    <div class="hud-top">
+      <div class="brand"><span class="brandmark">◈</span><div><span class="tiny">FPS GAME 01 / SECTOR SEVEN</span>NEON BREACH</div></div>
+      <div class="mission"><span class="tiny">SURVIVAL PROTOCOL // ACTIVE</span>WAVE <strong id="wave">00</strong><br><span style="color:#b0c2d0">SCORE</span> <em id="score">000000</em> &nbsp; <span style="color:#b0c2d0">KILLS</span> <em id="kills">0</em></div>
+    </div>
+    <canvas id="minimap" width="180" height="180" aria-label="Arena minimap"></canvas>
+    <div id="direction">0° // TACTICAL</div>
+    <div id="crosshair"><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i></div>
+    <div id="hitmarker">×</div>
+    <div id="notification"></div>
+    <div id="killfeed"></div>
+    <div id="bottom">
+      <div class="panel">
+        <div class="caption">OPERATIVE VITALS</div><div class="number"><span id="health">100</span><span class="unit"> / 100</span></div>
+        <div class="track"><div id="healthbar"></div></div><div class="track" id="staminaTrack"><div id="staminabar"></div></div>
+        <div class="caption" style="margin-top:6px">HEALTH / SPRINT STAMINA</div>
+      </div>
+      <div class="panel right">
+        <div class="caption">MK18 // ASSAULT PLATFORM</div>
+        <div class="number"><span id="rounds">30</span><span class="unit"> / <span id="reserve">180</span></span></div>
+        <div id="reloadbar"><div></div></div>
+        <div class="caption" style="margin-top:7px">5.56 MM · AUTOMATIC</div>
+      </div>
+    </div>
+    <div id="status"><span id="dash">WASD</span> MOVE &nbsp;·&nbsp; SHIFT SPRINT &nbsp;·&nbsp; C CROUCH &nbsp;·&nbsp; RMB AIM &nbsp;·&nbsp; LMB FIRE &nbsp;·&nbsp; R RELOAD &nbsp;·&nbsp; ESC PAUSE</div>
+  </section>
+  <section id="overlay" aria-label="Game menu">
+    <div class="menu">
+      <div>
+        <p class="eyebrow">◈ &nbsp; OPERATION: LAST LIGHT</p>
+        <h1 id="menuTitle">NEON<br><span>BREACH</span></h1>
+        <p class="subtitle" id="menuDescription">Enter a fortified industrial exclusion zone at dusk. Hostile security units are closing in. Hold your ground, use cover, and survive the assault.</p>
+        <button type="button" id="play">DEPLOY OPERATIVE &nbsp;↗</button>
+        <div class="captionline">Version 2.0 · real 3D engine · desktop mouse + keyboard</div>
+      </div>
+      <aside class="control-card">
+        <h2>TACTICAL CONTROLS</h2>
+        <div class="control"><span>Movement</span><kbd>W A S D</kbd></div>
+        <div class="control"><span>Look / aim</span><kbd>MOUSE</kbd></div>
+        <div class="control"><span>Fire weapon</span><kbd>LEFT CLICK</kbd></div>
+        <div class="control"><span>Aim down sights</span><kbd>RIGHT CLICK</kbd></div>
+        <div class="control"><span>Sprint / crouch</span><kbd>SHIFT / C</kbd></div>
+        <div class="control"><span>Reload / pause</span><kbd>R / ESC</kbd></div>
+        <p class="smallnote">Dynamic lighting · 3D armored enemies · aim-down-sights · weapon recoil · hit reactions · enemy projectiles · health and ammo pickups · escalating waves. Three.js is loaded online when the game starts.</p>
+      </aside>
+    </div>
+  </section>
+  <div id="fatal"><div><h2>3D ENGINE NOT AVAILABLE</h2><p>Use a WebGL-capable browser with an internet connection, then refresh the page.</p></div></div>
+  <script type="module" src="./game.js"></script>
+  <script>setTimeout(() => { if (!window.__neonReady) document.getElementById('fatal').classList.add('show'); }, 15000);</script>
+</body>
+</html>
