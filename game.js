@@ -35,7 +35,7 @@ const redGlow = new THREE.MeshStandardMaterial({ color: 0xff5969, emissive: 0xdf
 const groundSize = 61;
 let audio = null, started = false, running = false, mouseDown = false, ads = false, time = 0, noticeTimer = 0, hitTimer = 0, damageTimer = 0, flashTimer = 0, nextWaveTimer = -1, best = 0;
 try { best = Number(localStorage.getItem('neon-breach-best')) || 0; } catch {}
-const player = {pos:v3(0,0,15),vel:v3(),yaw:0,pitch:0,eye:1.7,hp:100,stamina:100,mag:30,reserve:180,score:0,wave:0,kills:0,shots:0,hits:0,reload:0,fireCooldown:0,recoil:0,bob:0,stepCooldown:0};
+const player = {pos:v3(0,0,17),vel:v3(),yaw:0,pitch:0,eye:1.7,hp:100,stamina:100,mag:30,reserve:180,score:0,wave:0,kills:0,shots:0,hits:0,reload:0,fireCooldown:0,recoil:0,bob:0,stepCooldown:0};
 const game = { elapsed:0 };
 
 function box(parent, w,h,d, x,y,z, material, solid=false, shadows=true) {
@@ -397,8 +397,8 @@ function update(dt){
 }
 function reset(){
   for(const e of [...enemies])eraseEnemy(e);
-  for(const arr of [projectiles,particles,pickups,tracers]){for(const o of arr){const obj=o.mesh||o.line;scene.remove(obj);if(o!==undefined&&obj.geometry&&obj!==o.mesh)obj.geometry.dispose()}arr.length=0}
-  Object.assign(player,{pos:v3(0,0,15),vel:v3(),yaw:0,pitch:0,eye:1.7,hp:100,stamina:100,mag:30,reserve:180,score:0,wave:0,kills:0,shots:0,hits:0,reload:0,fireCooldown:0,recoil:0,bob:0,stepCooldown:0});
+  for(const arr of [projectiles,particles,pickups,tracers]){for(const o of arr){const obj=o.mesh||o.line;scene.remove(obj);if(obj.geometry)obj.geometry.dispose();if(obj.material&&obj.material.dispose)obj.material.dispose()}arr.length=0}
+  Object.assign(player,{pos:v3(0,0,17),vel:v3(),yaw:0,pitch:0,eye:1.7,hp:100,stamina:100,mag:30,reserve:180,score:0,wave:0,kills:0,shots:0,hits:0,reload:0,fireCooldown:0,recoil:0,bob:0,stepCooldown:0});
   game.elapsed=0;nextWaveTimer=-1;time=0;ads=false;mouseDown=false;$('killfeed').innerHTML='';$('reloadbar').style.display='none';updateHUD();spawnWave();started=true;running=true;overlay.classList.add('hidden');$('hud').classList.add('visible');
 }
 function showMenu(title,desc,buttonText){
